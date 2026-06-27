@@ -1,55 +1,61 @@
-const cursorGlow = document.querySelector(".cursor-glow");
-const magneticItems = document.querySelectorAll(".magnetic");
-const canvas = document.getElementById("constellation");
+const canvas = document.getElementById("networkCanvas");
 const ctx = canvas.getContext("2d");
+const revealItems = document.querySelectorAll(".reveal");
+const interactiveCards = document.querySelectorAll(".value-card, .use-card, .positioning-board, .offer-card");
+const tiltCard = document.querySelector(".tilt-card");
 
-let width;
-let height;
 let particles = [];
-let mouse = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+let mouse = { x: -9999, y: -9999 };
+let dpr = Math.min(window.devicePixelRatio || 1, 2);
 
 function resizeCanvas() {
-  width = canvas.width = window.innerWidth * window.devicePixelRatio;
-  height = canvas.height = window.innerHeight * window.devicePixelRatio;
-  canvas.style.width = `${window.innerWidth}px`;
-  canvas.style.height = `${window.innerHeight}px`;
-  ctx.setTransform(window.devicePixelRatio, 0, 0, window.devicePixelRatio, 0, 0);
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  canvas.style.width = `${w}px`;
+  canvas.style.height = `${h}px`;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   createParticles();
 }
 
 function createParticles() {
-  const count = Math.min(95, Math.floor(window.innerWidth / 18));
+  const isMobile = window.innerWidth < 760;
+  const count = isMobile ? 28 : Math.min(76, Math.floor(window.innerWidth / 24));
+
   particles = Array.from({ length: count }, () => ({
     x: Math.random() * window.innerWidth,
     y: Math.random() * window.innerHeight,
-    vx: (Math.random() - 0.5) * 0.28,
-    vy: (Math.random() - 0.5) * 0.28,
-    r: Math.random() * 1.8 + 0.6
+    vx: (Math.random() - 0.5) * (isMobile ? 0.12 : 0.22),
+    vy: (Math.random() - 0.5) * (isMobile ? 0.12 : 0.22),
+    r: Math.random() * 1.6 + 0.45
   }));
 }
 
-function drawConstellation() {
+function drawNetwork() {
   ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
 
   for (const p of particles) {
     p.x += p.vx;
     p.y += p.vy;
 
-    if (p.x < 0 || p.x > window.innerWidth) p.vx *= -1;
-    if (p.y < 0 || p.y > window.innerHeight) p.vy *= -1;
+    if (p.x < -20) p.x = window.innerWidth + 20;
+    if (p.x > window.innerWidth + 20) p.x = -20;
+    if (p.y < -20) p.y = window.innerHeight + 20;
+    if (p.y > window.innerHeight + 20) p.y = -20;
 
     const dx = mouse.x - p.x;
     const dy = mouse.y - p.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
+    const dist = Math.sqrt(dx * dx + dy * dy);
 
-    if (distance < 155) {
-      p.x -= dx * 0.0009;
-      p.y -= dy * 0.0009;
+    if (dist < 150) {
+      p.x -= dx * 0.0007;
+      p.y -= dy * 0.0007;
     }
 
     ctx.beginPath();
     ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(125, 190, 255, 0.55)";
+    ctx.fillStyle = "rgba(139, 199, 255, 0.5)";
     ctx.fill();
   }
 
@@ -59,35 +65,30 @@ function drawConstellation() {
       const b = particles[j];
       const dx = a.x - b.x;
       const dy = a.y - b.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
+      const dist = Math.sqrt(dx * dx + dy * dy);
 
-      if (distance < 128) {
+      if (dist < 118) {
         ctx.beginPath();
         ctx.moveTo(a.x, a.y);
         ctx.lineTo(b.x, b.y);
-        ctx.strokeStyle = `rgba(93, 241, 255, ${0.16 * (1 - distance / 128)})`;
+        ctx.strokeStyle = `rgba(100, 242, 255, ${0.15 * (1 - dist / 118)})`;
         ctx.lineWidth = 1;
         ctx.stroke();
       }
     }
   }
 
-  requestAnimationFrame(drawConstellation);
+  requestAnimationFrame(drawNetwork);
 }
 
 window.addEventListener("resize", resizeCanvas);
 window.addEventListener("mousemove", (event) => {
   mouse.x = event.clientX;
   mouse.y = event.clientY;
-
-  if (cursorGlow) {
-    cursorGlow.style.left = `${event.clientX}px`;
-    cursorGlow.style.top = `${event.clientY}px`;
-  }
 });
 
 resizeCanvas();
-drawConstellation();
+drawNetwork();
 
 const revealObserver = new IntersectionObserver((entries) => {
   entries.forEach((entry) => {
@@ -96,13 +97,11 @@ const revealObserver = new IntersectionObserver((entries) => {
       revealObserver.unobserve(entry.target);
     }
   });
-}, { threshold: 0.16 });
+}, { threshold: 0.14 });
 
-document.querySelectorAll(".reveal").forEach((element) => {
-  revealObserver.observe(element);
-});
+revealItems.forEach((item) => revealObserver.observe(item));
 
-document.querySelectorAll(".glass-panel, .market-card, .acquisition-card").forEach((card) => {
+interactiveCards.forEach((card) => {
   card.addEventListener("mousemove", (event) => {
     const rect = card.getBoundingClientRect();
     card.style.setProperty("--mx", `${event.clientX - rect.left}px`);
@@ -110,64 +109,20 @@ document.querySelectorAll(".glass-panel, .market-card, .acquisition-card").forEa
   });
 });
 
-magneticItems.forEach((item) => {
-  item.addEventListener("mousemove", (event) => {
-    const rect = item.getBoundingClientRect();
-    const x = event.clientX - rect.left - rect.width / 2;
-    const y = event.clientY - rect.top - rect.height / 2;
-    item.style.transform = `translate(${x * 0.14}px, ${y * 0.24}px)`;
+if (tiltCard) {
+  tiltCard.addEventListener("mousemove", (event) => {
+    if (window.innerWidth < 900) return;
+
+    const rect = tiltCard.getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    const rotateY = ((x / rect.width) - 0.5) * 8;
+    const rotateX = -((y / rect.height) - 0.5) * 8;
+
+    tiltCard.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
   });
 
-  item.addEventListener("mouseleave", () => {
-    item.style.transform = "";
+  tiltCard.addEventListener("mouseleave", () => {
+    tiltCard.style.transform = "";
   });
-});
-
-const lines = [
-  "domain: 'Plumbous.com'",
-  "status: 'available for acquisition'",
-  "extension: '.com'",
-  "positioning: ['AI', 'cybersecurity', 'science', 'ventures']",
-  "brand_quality: 'distinctive, serious, expandable'",
-  "action: 'send direct offer to owner'"
-];
-
-const typeTarget = document.getElementById("typewriter");
-let lineIndex = 0;
-let charIndex = 0;
-let currentText = "";
-
-function typeLoop() {
-  if (!typeTarget) return;
-
-  if (lineIndex < lines.length) {
-    const line = lines[lineIndex];
-
-    if (charIndex < line.length) {
-      currentText += line.charAt(charIndex);
-      typeTarget.textContent = currentText + "█";
-      charIndex++;
-      setTimeout(typeLoop, 28 + Math.random() * 26);
-    } else {
-      currentText += "\n";
-      typeTarget.textContent = currentText + "█";
-      lineIndex++;
-      charIndex = 0;
-      setTimeout(typeLoop, 420);
-    }
-  } else {
-    typeTarget.textContent = currentText;
-  }
 }
-
-setTimeout(typeLoop, 1400);
-
-document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
-  anchor.addEventListener("click", (event) => {
-    const target = document.querySelector(anchor.getAttribute("href"));
-    if (!target) return;
-
-    event.preventDefault();
-    target.scrollIntoView({ behavior: "smooth", block: "start" });
-  });
-});
